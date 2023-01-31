@@ -14,7 +14,7 @@ dt-launchfile-init
 
 # launching app
 dt-exec rosrun db_lanefollowing lanefollowing_pub.py
-
+dt-exec rosrun db_lanefollowing subscribers.py
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE
