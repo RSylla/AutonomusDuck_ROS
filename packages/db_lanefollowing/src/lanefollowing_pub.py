@@ -44,7 +44,7 @@ class AutonomusDuck(DTROS):
         self.tof_data = data.range
 
     def is_obstacle(self):
-        if 0.1 < self.tof_data < 0.25:
+        if 0.1 < self.tof_data < 0.45:
             return True
         return False
 
