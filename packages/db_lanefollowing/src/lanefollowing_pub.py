@@ -1,142 +1,161 @@
 #!/usr/bin/env python3
+import rospy
+import os
+from smbus2 import SMBus
+from duckietown.dtros import DTROS, NodeType
+from duckietown_msgs.msg import WheelsCmdStamped, WheelEncoderStamped
+from sensor_msgs.msg import Range
 import time
 
-import rospy
-from smbus2 import SMBus
-from duckietown_msgs.msg import WheelsCmdStamped, WheelEncoderStamped
-from subscribers import Subscribers
 
-"""
-Brake the right wheel:
-Little left if arr <= 6
-More left if arr <= 3
-Hard left if arr <= 1
-
-Brake the left wheel:
-Little right if arr >= 32
-More right if arr >= 64
-Hard hard if arr >= 128
-
-backwards if arr == 0
-
-forwards if arr in range 48, 24, 12, 16, 28,56, 8
-
-node_type=NodeType.GENERIC
-"""
-
-
-class AutonomusDuck(Subscribers):
+class AutonomusDuck(DTROS):
 
     def __init__(self, node_name):
-        super().__init__(node_name=node_name)
-        # construct publisher
-        self.pub_wheels_cmd = rospy.Publisher("/blubot/wheels_driver_node/wheels_cmd", WheelsCmdStamped, queue_size=10)
+        # initialize the DTROS parent class
+        super(AutonomusDuck, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
+        # construct wheel command publisher
+        self.veh_name = os.environ["VEHICLE_NAME"]
+        self.pub_wheels_cmd = rospy.Publisher(f"/{self.veh_name}/wheels_driver_node/wheels_cmd",
+                                              WheelsCmdStamped, queue_size=10)
         self.msg_wheels_cmd = WheelsCmdStamped()
-        self.arr = SMBus(14)
+        # Create i2c bus instance
+        self.arr = SMBus(1)
+
+        # initial values to be overwritten
+        self.tof_data = 0
+        self.right_wheel = 0
+        self.left_wheel = 0
+
+        # construct wheel encoders and tof sensor subscribers
+        self.left_encoder_data = rospy.Subscriber(f'/{self.veh_name}/left_wheel_encoder_node/tick',
+                                                  WheelEncoderStamped, self.left_callback)
+        self.right_encoder_data = rospy.Subscriber(f'/{self.veh_name}/right_wheel_encoder_node/tick',
+                                                   WheelEncoderStamped, self.right_callback)
+        self.tof_sensor = rospy.Subscriber(f'/{self.veh_name}/front_center_tof_driver_node/range',
+                                           Range, self.tof_callback)
+
+    def left_callback(self, data):
+        self.left_wheel = data.data
+
+    def right_callback(self, data):
+        self.right_wheel = data.data
+
+    def tof_callback(self, data):
+        self.tof_data = data.range
 
     def is_obstacle(self):
-        # print("distance: ", self.tof_data)
         if 0.1 < self.tof_data < 0.25:
             return True
         return False
-
-    def show_stats(self):
-        print(f"Range: {round(self.tof_data, 2)}\n"
-              f"Left motor: {self.left_wheel}\n"
-              f"Right motor: {self.right_wheel}\n"
-              f"Is Obstacle: {self.is_obstacle()}\n"
-              f"----------------------")
 
     def shutdown(self):
         self.msg_wheels_cmd.vel_right = 0
         self.msg_wheels_cmd.vel_left = 0
         self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
 
-
-    def run(self):
-        rate = rospy.Rate(20)
-        last_dir = None
-        array_value = self.arr.read_byte_data(0x3e, 0x11)
-
-        if array_value == 255:
-            self.msg_wheels_cmd.vel_right = 0
-            self.msg_wheels_cmd.vel_left = 0
-            self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+    def arr_input(self):
+        array_value = bin(self.arr.read_byte_data(0x3e, 0x11))[2:].zfill(8)
+        new_values_list = [-4, -3, -2, -1, 1, 2, 3, 4]
+        bitsum = 0
+        counter = 0
+        for index in range(len(array_value)):
+            if array_value[index] == "1":
+                bitsum += new_values_list[index]
+                counter += 1
+        if counter == 0 or counter == 8:
+            result = "off"
         else:
-            if array_value == 0:
-                if last_dir == 1:
-                    self.msg_wheels_cmd.vel_right = 0
-                    self.msg_wheels_cmd.vel_left = 0.2
-                    self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                elif last_dir == 0:
-                    self.msg_wheels_cmd.vel_right = 0.2
-                    self.msg_wheels_cmd.vel_left = 0
-                    self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+            result = bitsum / counter
+        return result
 
-            # Masin keerab j2rsult paremale
-            elif array_value == 1:
-                self.msg_wheels_cmd.vel_right = 0.2
-                self.msg_wheels_cmd.vel_left = 0.6
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                last_dir = 1
+    def run(self, v_max, pid):
 
-            # Masin keerab j2rsult vasakule
-            elif array_value >= 128:
-                self.msg_wheels_cmd.vel_right = 0.6
-                self.msg_wheels_cmd.vel_left = 0.2
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                last_dir = 0
+        right_speed = v_max - pid
+        left_speed = v_max + pid
 
-            # Masin keerab paremale
-            elif 1 < array_value <= 3:
-                self.msg_wheels_cmd.vel_right = 0.2
-                self.msg_wheels_cmd.vel_left = 0.5
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                last_dir = 1
+        if right_speed <= 0.1:
+            left_speed = 0.4
 
-            # Masin keerab vasakule
-            elif 33 <= array_value <= 64 and array_value != 48:
-                self.msg_wheels_cmd.vel_right = 0.5
-                self.msg_wheels_cmd.vel_left = 0.2
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                last_dir = 0
+        if left_speed <= 0.1:
+            right_speed = 0.4
 
-            # Masin veidikene paremale
-            elif 4 <= array_value >= 7:
-                self.msg_wheels_cmd.vel_right = 0.3
-                self.msg_wheels_cmd.vel_left = 0.4
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                last_dir = 1
-
-            # Masin keerab veidikene vasakule
-            elif 24 <= array_value <= 32:
-                self.msg_wheels_cmd.vel_right = 0.4
-                self.msg_wheels_cmd.vel_left = 0.3
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-                last_dir = 0
-
-            # Masin s6idab otse t2iskiirusel
-            else:
-                self.msg_wheels_cmd.vel_right = 0.8
-                self.msg_wheels_cmd.vel_left = 0.8
-                self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-
-        rate.sleep()
+        self.msg_wheels_cmd.vel_right = right_speed if right_speed >= 0 else 0
+        self.msg_wheels_cmd.vel_left = left_speed if left_speed >= 0 else 0
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
 
 
-if __name__ == '__main__':
+def main():
     # create the node
     node = AutonomusDuck(node_name="AutonomusDuck")
-    # run node
+
+    start_time = time.time()
+    previous_error = 0
+    integral = 0
+
+    # Set initial parameters for duck's devel run (run, Kp, Ki, Kd, v_max).
+    rospy.set_param("/rpidv", [0, 0.055, 0.00015, 15, 0.5])
+    """
+    Best settings so far:
+    [1, 0.055, 0.00015, 15, 0.5]
+    [1, 0.05, 0.00015, 13, 0.5]
+    [1, 0.028, 0.000003, 4.2, 0.4]
+    """
     while True:
-        try:
-            node.show_stats()
+        # Measure elapsed time
+        delta_time = time.time() - start_time
+
+        # Get parameters from ROS
+        run, kp, ki, kd, v_max = rospy.get_param("/rpidv")
+
+        # Input is a value from -4 to 4
+        arr_position = node.arr_input()
+        if arr_position == "off":
+            continue
+
+        # ---- Section for PID controller --------------------------------
+        # Since target is 0, the error is actual (arr position).
+        target = 0
+        error = arr_position - target
+
+        # Proportional:
+        p = kp * error
+
+        # Integral:
+        integral += ki * error
+
+        # Clamp integral to avoid wind-up
+        if error == 0:
+            integral = 0
+        i = integral
+        if integral > 1:
+            i = 1
+        elif integral < -1:
+            i = -1
+
+        # Derivative:
+        d = kd * (error - previous_error)
+        pid = p + i + d
+
+        print(f"P: {p}\n"
+              f"I: {i}\n"
+              f"D: {d}\n"
+              f"PID: {pid}")
+        # -- End section --------------------------------------------------------
+
+        if run:
             if node.is_obstacle():
                 node.shutdown()
             else:
-                node.run()
-        except ValueError:
-            pass
+                node.run(v_max, pid)
+        else:
+            node.shutdown()
+
+        # Overwrite previous error with current error.
+        previous_error = arr_position
+        start_time = time.time()
+
+        # time.sleep(0.003) #to set loops per sec
 
 
-
+if __name__ == '__main__':
+    main()
