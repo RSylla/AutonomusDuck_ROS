@@ -154,6 +154,7 @@ def main():
         previous_error = arr_position
         start_time = time.time()
 
+
         # time.sleep(0.003) #to set loops per sec
 
 
