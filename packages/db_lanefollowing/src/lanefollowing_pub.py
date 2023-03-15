@@ -6,6 +6,7 @@ from duckietown.dtros import DTROS, NodeType
 from duckietown_msgs.msg import WheelsCmdStamped, WheelEncoderStamped
 from sensor_msgs.msg import Range
 import time
+from std_msgs.msg import String
 
 
 class AutonomusDuck(DTROS):
@@ -20,13 +21,13 @@ class AutonomusDuck(DTROS):
         self.msg_wheels_cmd = WheelsCmdStamped()
         rospy.on_shutdown(self.shutdown)
         # Create i2c bus instance
-        self.arr = SMBus(1)
+
 
         # initial values to be overwritten
         self.tof_data = 0
         self.right_wheel = 0
         self.left_wheel = 0
-
+        self.odovalues = 0
         # construct wheel encoders and tof sensor subscribers
         self.left_encoder_data = rospy.Subscriber(f'/{self.veh_name}/left_wheel_encoder_node/tick',
                                                     WheelEncoderStamped, self.left_callback)
@@ -34,6 +35,12 @@ class AutonomusDuck(DTROS):
                                                     WheelEncoderStamped, self.right_callback)
         self.tof_sensor = rospy.Subscriber(f'/{self.veh_name}/front_center_tof_driver_node/range',
                                                     Range, self.tof_callback)
+
+        self.odo = rospy.Subscriber(f'/{self.veh_name}/odometry', String, self.odo)
+
+    def odo(self, data):
+        self.odovalues = data
+
 
     def left_callback(self, data):
         self.left_wheel = data.data
@@ -89,9 +96,9 @@ class AutonomusDuck(DTROS):
         self.msg_wheels_cmd.vel_right = right_speed
         self.msg_wheels_cmd.vel_left = left_speed
         self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        print(f"V max: {v_max}\n"
-              f"V left: {left_speed}\n"
-              f"V Right: {right_speed}")
+        # print(f"V max: {v_max}\n"
+        #       f"V left: {left_speed}\n"
+        #       f"V Right: {right_speed}")
 
 
 def main():
@@ -103,7 +110,7 @@ def main():
     integral = 0
 
     # Set initial parameters for duck's devel run (run, Kp, Ki, Kd, v_max).
-    rospy.set_param("/rpidv", [1, 0.065, 0.000215, 0.01385, 0.42])
+    rospy.set_param("/rpidv", [0, 0.065, 0.000215, 0.01385, 0.42])
     """
     rosparam set /rpidv "[1, 0.065, 0.000215, 0.01385, 0.42]"
     Best settings so far:
@@ -132,8 +139,8 @@ def main():
 
         # Proportional:
         p = kp * error
-        print(f"Error: {error}\n"
-              f"P: {p}")
+        # print(f"Error: {error}\n"
+        #       f"P: {p}")
         # Integral:
         integral += error * delta_time
         i = ki * integral
@@ -142,13 +149,13 @@ def main():
         i = min(max(i, -1), 1)
         if error == 0:
             i = 0
-        print(f"I: {i}")
+        # print(f"I: {i}")
         # Derivative:
         d = kd * ((error - previous_error) / delta_time)
 
         pid = min(max(p + i + d, -0.7), 0.7)
-        print(f"D: {d}\n"
-              f"pid: {pid}")
+        # print(f"D: {d}\n"
+        #       f"pid: {pid}")
 
         # print(f"PID: {pid}")
         # ---- End section ------------------------------------------------
@@ -164,6 +171,7 @@ def main():
         # Overwrite previous error with current error.
         previous_error = arr_position
         start_time = time.time()
+
 
         time.sleep(0.02) #to set loops per sec
 
