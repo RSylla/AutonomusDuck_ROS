@@ -15,6 +15,7 @@ dt-launchfile-init
 # launching app
 dt-exec rosrun db_lanefollowing AutonomusDuck.py
 dt-exec rosrun db_lanefollowing odometry.py
+dt-exec rosrun db_lanefollowing array_pub.py
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import roslibpy as rospy
+import rospy
 import os
 from smbus2 import SMBus
 from duckietown.dtros import DTROS, NodeType
@@ -29,7 +29,7 @@ class AutonomusDuck(DTROS):
         self.left_wheel = 0
         self.odo_values = 0
         self.array_value = 0
-
+        self.left_turn = False
         # construct wheel encoders and tof sensor subscribers
         self.left_encoder_data = rospy.Subscriber(f'/{self.veh_name}/left_wheel_encoder_node/tick',
                                                     WheelEncoderStamped, self.left_callback)
@@ -41,11 +41,11 @@ class AutonomusDuck(DTROS):
         self.array = rospy.Subscriber(f'/{self.veh_name}/line_array', String, self.array_callback)
 
     def odo_callback(self, data):
-        self.odo_values = data.data
-
+        self.odo_values = data
+        
     def array_callback(self, data):
         self.array_value = data.data
-
+        
     def left_callback(self, data):
         self.left_wheel = data.data
 
@@ -54,11 +54,6 @@ class AutonomusDuck(DTROS):
 
     def tof_callback(self, data):
         self.tof_data = data.range
-
-    def is_obstacle(self):
-        if 0.1 < self.tof_data < 0.25:
-            return True
-        return False
 
     def shutdown(self):
         self.msg_wheels_cmd.vel_right = 0
@@ -104,6 +99,36 @@ class AutonomusDuck(DTROS):
         #       f"V left: {left_speed}\n"
         #       f"V Right: {right_speed}")
 
+    def turn_left(self):
+        self.msg_wheels_cmd.vel_left = 0.0
+        self.msg_wheels_cmd.vel_right = 0.1
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+        print("turning left")
+    def turn_right(self):
+        self.msg_wheels_cmd.vel_left = 0.05
+        self.msg_wheels_cmd.vel_right = 0.01
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+        print("turning right")
+    def go_straight_to_line(self):
+        self.msg_wheels_cmd.vel_left = 0.2
+        self.msg_wheels_cmd.vel_right = 0.35
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+        print("going straight to line")    
+    def go_straight(self):
+        self.msg_wheels_cmd.vel_left = 0.15
+        self.msg_wheels_cmd.vel_right = 0.15
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+        print("going straight")
+    def stop(self):
+        self.msg_wheels_cmd.vel_left = 0.0
+        self.msg_wheels_cmd.vel_right = 0.0
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+        print("stopping")
+    def choose_left_lane_speed(self):
+        self.msg_wheels_cmd.vel_right = 0.28
+        self.msg_wheels_cmd.vel_left = 0.2
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)    
+        print("choosing left lane speed")
 
 def main():
     # create the node
@@ -112,7 +137,6 @@ def main():
     start_time = time.time()
     prev_error = 0
     integral = 0
-
     # Set initial parameters for duck's devel run (run, Kp, Ki, Kd, v_max).
     rospy.set_param("/rpidv", [0, 0.065, 0.000215, 0.01385, 0.42])
     """
@@ -128,19 +152,37 @@ def main():
         delta_time = time.time() - start_time
         # Get parameters from ROS
         run, kp, ki, kd, v_max = rospy.get_param("/rpidv")
-        # # Input is a value from -4 to 4
-        # try:
-        #     arr_position = node.arr_input()
-        # except:
-        #     arr_position = prev_error
 
-        error = error_calculator(node.array_value)
+        if node.left_turn == True:
+            print("left turn=ture")
+            node.choose_left_lane_speed()
+            time.sleep(0.7)
+            node.left_turn = False
+
+        
+        try:
+            print(node.array_value)
+            error, node.left_turn = error_calculator(node.array_value)
+                
+        except:
+            error = prev_error
+        print(error, node.left_turn)
         pid, integral, prev_error = pid_controller(error, integral,
                                                    prev_error, delta_time,
                                                    kp, ki, kd)
+
         if run:
-            if node.is_obstacle():
-                node.shutdown()
+            if node.tof_data < 0.25:
+                node.turn_right()
+                time.sleep(1.2)
+                node.go_straight()
+                time.sleep(1.1)
+                node.turn_left()
+                time.sleep(1)
+                node.stop()
+                time.sleep(0.2)
+                node.go_straight_to_line()
+                time.sleep(2)
             else:
                 node.run(v_max, pid)
         else:
