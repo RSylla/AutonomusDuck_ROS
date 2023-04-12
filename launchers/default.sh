@@ -13,7 +13,7 @@ dt-launchfile-init
 # NOTE: Use `dt-exec COMMAND` to run the main process (blocking process)
 
 # launching app
-dt-exec rosrun db_lanefollowing lanefollowing_pub.py
+dt-exec rosrun db_lanefollowing AutonomusDuck.py
 dt-exec rosrun db_lanefollowing odometry.py
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE
