@@ -1,3 +1,10 @@
 # LIST YOUR PYTHON3 PACKAGES HERE
+
+#For linearray reader
 smbus2
-tk
+
+#For imu node
+adafruit-circuitpython-mpu6050
+# Jetson packages
+#   - 2.0.20 is the last version supporting Python3.8
+Jetson.GPIO<=2.0.20
