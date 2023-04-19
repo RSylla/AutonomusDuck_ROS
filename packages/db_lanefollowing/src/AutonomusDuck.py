@@ -99,36 +99,28 @@ class AutonomusDuck(DTROS):
         #       f"V left: {left_speed}\n"
         #       f"V Right: {right_speed}")
 
+    def set_wheels_velocity(self, left, right):
+        self.msg_wheels_cmd.vel_left = left
+        self.msg_wheels_cmd.vel_right = right
+        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
+
     def turn_left(self):
-        self.msg_wheels_cmd.vel_left = 0.0
-        self.msg_wheels_cmd.vel_right = 0.1
-        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        print("turning left")
+        self.set_wheels_velocity(0.0, 0.1)
+
     def turn_right(self):
-        self.msg_wheels_cmd.vel_left = 0.05
-        self.msg_wheels_cmd.vel_right = 0.01
-        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        print("turning right")
+        self.set_wheels_velocity(0.05, 0.01)
+
     def go_straight_to_line(self):
-        self.msg_wheels_cmd.vel_left = 0.2
-        self.msg_wheels_cmd.vel_right = 0.35
-        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        print("going straight to line")    
+        self.set_wheels_velocity(0.2, 0.35)
+
     def go_straight(self):
-        self.msg_wheels_cmd.vel_left = 0.15
-        self.msg_wheels_cmd.vel_right = 0.15
-        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        print("going straight")
+        self.set_wheels_velocity(0.15, 0.15)
+
     def stop(self):
-        self.msg_wheels_cmd.vel_left = 0.0
-        self.msg_wheels_cmd.vel_right = 0.0
-        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        print("stopping")
+        self.set_wheels_velocity(0.0, 0.0)
+
     def choose_left_lane_speed(self):
-        self.msg_wheels_cmd.vel_right = 0.28
-        self.msg_wheels_cmd.vel_left = 0.2
-        self.pub_wheels_cmd.publish(self.msg_wheels_cmd)    
-        print("choosing left lane speed")
+        self.set_wheels_velocity(0.2, 0.28)
 
 def main():
     # create the node
@@ -161,12 +153,10 @@ def main():
 
         
         try:
-            print(node.array_value)
             error, node.left_turn = error_calculator(node.array_value)
                 
         except:
             error = prev_error
-        print(error, node.left_turn)
         pid, integral, prev_error = pid_controller(error, integral,
                                                    prev_error, delta_time,
                                                    kp, ki, kd)
