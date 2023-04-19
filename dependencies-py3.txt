@@ -1,3 +1,4 @@
 # LIST YOUR PYTHON3 PACKAGES HERE
 smbus2
-tk
+adafruit-circuitpython-mpu6050
+Jetson.GPIO<=2.0.20
