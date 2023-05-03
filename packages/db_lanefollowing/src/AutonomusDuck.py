@@ -30,6 +30,7 @@ class AutonomusDuck(DTROS):
         self.odo_values = 0
         self.array_value = 0
         self.left_turn = False
+        self.executed_left_turn = False
         # construct wheel encoders and tof sensor subscribers
         self.left_encoder_data = rospy.Subscriber(f'/{self.veh_name}/left_wheel_encoder_node/tick',
                                                     WheelEncoderStamped, self.left_callback)
@@ -59,68 +60,26 @@ class AutonomusDuck(DTROS):
         self.msg_wheels_cmd.vel_right = 0
         self.msg_wheels_cmd.vel_left = 0
         self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-
-
-    # def arr_input(self):
-    #     array_value = bin(self.arr.read_byte_data(0x3e, 0x11))[2:].zfill(8)
-    #     new_values_list = [-5, -3, -2, -1, 1, 2, 3, 5]
-    #     bitsum = 0
-    #     counter = 0
-    #
-    #     for index in range(len(array_value)):
-    #         if array_value[index] == "1":
-    #             bitsum += new_values_list[index]
-    #             counter += 1
-    #
-    #     if counter == 0 or counter == 8:
-    #         raise ValueError
-    #     elif 3 <= counter <= 5:
-    #         result = bitsum
-    #     else:
-    #         result = bitsum / counter
-    #
-    #     return result
-
+  
     def run(self, v_max, pid):
 
         right_speed = max(0, v_max - pid)
         left_speed = max(0, v_max + pid)
 
         if right_speed < 0.05:
-            left_speed = v_max
+            left_speed = v_max 
 
         if left_speed < 0.05:
-            right_speed = v_max
+            right_speed = v_max 
 
         self.msg_wheels_cmd.vel_right = right_speed
         self.msg_wheels_cmd.vel_left = left_speed
         self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-        # print(f"V max: {v_max}\n"
-        #       f"V left: {left_speed}\n"
-        #       f"V Right: {right_speed}")
 
     def set_wheels_velocity(self, left, right):
         self.msg_wheels_cmd.vel_left = left
         self.msg_wheels_cmd.vel_right = right
         self.pub_wheels_cmd.publish(self.msg_wheels_cmd)
-
-    def turn_left(self):
-        self.set_wheels_velocity(0.0, 0.1)
-
-    def turn_right(self):
-        self.set_wheels_velocity(0.05, 0.01)
-
-    def go_straight_to_line(self):
-        self.set_wheels_velocity(0.2, 0.35)
-
-    def go_straight(self):
-        self.set_wheels_velocity(0.15, 0.15)
-
-    def stop(self):
-        self.set_wheels_velocity(0.0, 0.0)
-
-    def choose_left_lane_speed(self):
-        self.set_wheels_velocity(0.2, 0.28)
 
 def main():
     # create the node
@@ -135,9 +94,12 @@ def main():
     rosparam set /rpidv "[1, 0.065, 0.000215, 0.01385, 0.42]"
     Best settings so far:
     "[1, 0.065, 0.000215, 0.01385, 0.42]"
-    
+    rosparam set /rpidv "[1, 0.066, 0.0005, 0.036, 0.3]"
+    "[1, 0.066, 0.0005, 0.02, 0.28]"
     last: 
     "[1, 0.063, 0.000015, 0.0138, 0.45]"
+    rosparam set /rpidv "[1, 0.066, 0.0001, 0.020, 0.28]"
+    rosparam set /rpidv "[1, 0.064, 0.0001, 0.02, 0.29]"
     """
     while not rospy.is_shutdown():
         # Measure elapsed time
@@ -145,12 +107,11 @@ def main():
         # Get parameters from ROS
         run, kp, ki, kd, v_max = rospy.get_param("/rpidv")
 
-        if node.left_turn == True:
+        if node.left_turn == True and not node.executed_left_turn:
             print("left turn=ture")
-            node.choose_left_lane_speed()
+            node.set_wheels_velocity(0.2, 0.28)
             time.sleep(0.7)
-            node.left_turn = False
-
+            node.executed_left_turn = True
         
         try:
             error, node.left_turn = error_calculator(node.array_value)
@@ -162,17 +123,28 @@ def main():
                                                    kp, ki, kd)
 
         if run:
-            if node.tof_data < 0.25:
-                node.turn_right()
+
+            if 0.25 < node.tof_data < 0.35:
+                ##node.set_wheels_velocity(0.1, 0.0)
+                ##time.sleep(0.575)
+                ##node.set_wheels_velocity(0.15, 0.15)
+                ##time.sleep(1.2)
+                ##node.set_wheels_velocity(0.0, 0.1)
+                ##time.sleep(0.625)
+                ##node.set_wheels_velocity(0.10, 0.155)
+                ##time.sleep(1.8)
+                node.set_wheels_velocity(0.1, 0.0)
+                time.sleep(0.85)
+                node.set_wheels_velocity(0.15, 0.15)
                 time.sleep(1.2)
-                node.go_straight()
-                time.sleep(1.1)
-                node.turn_left()
-                time.sleep(1)
-                node.stop()
-                time.sleep(0.2)
-                node.go_straight_to_line()
-                time.sleep(2)
+                node.set_wheels_velocity(0.0, 0.1)
+                time.sleep(0.6)
+                node.set_wheels_velocity(0.15, 0.15)
+                time.sleep(1.4)
+                node.set_wheels_velocity(0.0, 0.1)
+                time.sleep(0.85)
+                node.set_wheels_velocity(0.25, 0.15)
+                time.sleep(0.4)
             else:
                 node.run(v_max, pid)
         else:

@@ -12,9 +12,13 @@ def talker():
     
     rate = rospy.Rate(20) # 10hz
     arr = SMBus(1)
+    last_array_value = 0
+
     while not rospy.is_shutdown():
-        
-        array_value = bin(arr.read_byte_data(0x3e, 0x11))[2:].zfill(8)
+        try:
+            array_value = bin(arr.read_byte_data(0x3e, 0x11))[2:].zfill(8)
+        except:
+            array_value = last_array_value
         
         pub.publish(array_value)
         rate.sleep()
