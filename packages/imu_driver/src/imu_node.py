@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import math
-
 import adafruit_mpu6050  # IMU Driver
 import board
 import rospy

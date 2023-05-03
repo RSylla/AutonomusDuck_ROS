@@ -9,6 +9,7 @@ def error_calculator(array_value):
     if array_value in left_turn_array_value_list:
         left_turn = True
     
+    
     for index in range(len(array_value)):
         if array_value[index] == "1":
             bitsum += new_values_list[index]
