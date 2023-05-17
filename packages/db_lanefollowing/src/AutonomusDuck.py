@@ -9,7 +9,7 @@ from sensor_msgs.msg import Range
 import time
 from std_msgs.msg import String
 from PIDcontroller import pid_controller, error_calculator
-
+from collections import deque
 
 class AutonomusDuck(DTROS):
 
@@ -24,7 +24,7 @@ class AutonomusDuck(DTROS):
         rospy.on_shutdown(self.shutdown)
 
         # initial values to be overwritten
-        self.tof_data = 0
+        self.tof_data = deque([1,1,1,1,1],5)
         self.right_wheel = 0
         self.left_wheel = 0
         self.odo_values = 0
@@ -54,7 +54,7 @@ class AutonomusDuck(DTROS):
         self.right_wheel = data.data
 
     def tof_callback(self, data):
-        self.tof_data = data.range
+        self.tof_data.append(data.range)
 
     def shutdown(self):
         self.msg_wheels_cmd.vel_right = 0
@@ -67,10 +67,10 @@ class AutonomusDuck(DTROS):
         left_speed = max(0, v_max + pid)
 
         if right_speed < 0.05:
-            left_speed = v_max 
+            left_speed = v_max + 0.05
 
         if left_speed < 0.05:
-            right_speed = v_max 
+            right_speed = v_max + 0.05
 
         self.msg_wheels_cmd.vel_right = right_speed
         self.msg_wheels_cmd.vel_left = left_speed
@@ -88,8 +88,9 @@ def main():
     start_time = time.time()
     prev_error = 0
     integral = 0
+    left_turn_start_time = 0
     # Set initial parameters for duck's devel run (run, Kp, Ki, Kd, v_max).
-    rospy.set_param("/rpidv", [0, 0.065, 0.000215, 0.01385, 0.42])
+    rospy.set_param("/rpidv", [0, 0.064, 0.0001, 0.02, 0.32])
     """
     rosparam set /rpidv "[1, 0.065, 0.000215, 0.01385, 0.42]"
     Best settings so far:
@@ -102,18 +103,29 @@ def main():
     rosparam set /rpidv "[1, 0.064, 0.0001, 0.02, 0.29]"
     """
     
+
     while not rospy.is_shutdown():
         # Measure elapsed time
         delta_time = time.time() - start_time
         # Get parameters from ROS
         run, kp, ki, kd, v_max = rospy.get_param("/rpidv")
+        
+       
+        tof_data = sum(node.tof_data)/len(node.tof_data)
 
         if node.left_turn == True and not node.executed_left_turn:
-            print("left turn=ture")
+            #left_turn_start_time = time.time()
+            print("left turn = True")
             node.set_wheels_velocity(0.2, 0.28)
-            time.sleep(0.7)
+            time.sleep(1)
             node.executed_left_turn = True
         
+
+        #if node.executed_left_turn == True:
+        #    if time.time() - left_turn_start_time >= 60:
+        #        node.left_turn, node.executed_left_turn = False, False
+        #        print("Left turn = False")
+
         try:
             error, node.left_turn = error_calculator(node.array_value)
                 
@@ -124,8 +136,16 @@ def main():
                                                    kp, ki, kd)
 
         if run:
-
-            if 0.25 < node.tof_data < 0.35:
+            
+            if 0.25 < tof_data < 0.35:
+                node.set_wheels_velocity(0.2, 0.0)
+                time.sleep(0.735)
+                node.set_wheels_velocity(0.15, 0.15)
+                time.sleep(2.5)
+                node.set_wheels_velocity(0.0, 0.2)
+                time.sleep(0.85)
+                node.set_wheels_velocity(0.15, 0.2)
+                time.sleep(2)
                 ##node.set_wheels_velocity(0.1, 0.0)
                 ##time.sleep(0.575)
                 ##node.set_wheels_velocity(0.15, 0.15)
@@ -134,18 +154,18 @@ def main():
                 ##time.sleep(0.625)
                 ##node.set_wheels_velocity(0.10, 0.155)
                 ##time.sleep(1.8)
-                node.set_wheels_velocity(0.1, 0.0)
-                time.sleep(0.85)
-                node.set_wheels_velocity(0.15, 0.15)
-                time.sleep(1.2)
-                node.set_wheels_velocity(0.0, 0.1)
-                time.sleep(0.6)
-                node.set_wheels_velocity(0.15, 0.15)
-                time.sleep(1.4)
-                node.set_wheels_velocity(0.0, 0.1)
-                time.sleep(0.85)
-                node.set_wheels_velocity(0.25, 0.15)
-                time.sleep(0.4)
+                #node.set_wheels_velocity(0.2, 0.0)
+                #time.sleep(0.935)
+                #node.set_wheels_velocity(0.15, 0.15)
+                #time.sleep(1.4)
+                #node.set_wheels_velocity(0.0, 0.2)
+                #time.sleep(0.95)
+                #node.set_wheels_velocity(0.15, 0.15)
+                #time.sleep(1.2)
+                #node.set_wheels_velocity(0.0, 0.2)
+                #time.sleep(0.65)
+                #node.set_wheels_velocity(0.25, 0.15)
+                #time.sleep(1)
             else:
                 node.run(v_max, pid)
         else:

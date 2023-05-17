@@ -8,6 +8,7 @@ def error_calculator(array_value):
                                         '01000100','00100100', '01001000', '10001000','01001100'] #'11011000' '11010000' 10100000','10110000'
     if array_value in left_turn_array_value_list:
         left_turn = True
+        
     
     
     for index in range(len(array_value)):
