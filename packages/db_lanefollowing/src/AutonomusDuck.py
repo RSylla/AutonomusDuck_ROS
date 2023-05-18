@@ -29,7 +29,7 @@ class AutonomusDuck(DTROS):
         self.left_wheel = 0
         self.odo_values = 0
         self.array_value = 0
-        self.left_turn = False
+        self.left_turn = True
         self.executed_left_turn = False
         # construct wheel encoders and tof sensor subscribers
         self.left_encoder_data = rospy.Subscriber(f'/{self.veh_name}/left_wheel_encoder_node/tick',
@@ -90,20 +90,11 @@ def main():
     integral = 0
     left_turn_start_time = 0
     # Set initial parameters for duck's devel run (run, Kp, Ki, Kd, v_max).
-    rospy.set_param("/rpidv", [0, 0.064, 0.0001, 0.02, 0.32])
+    rospy.set_param("/rpidv", [1, 0.064, 0.0001, 0.02, 0.32])
     """
-    rosparam set /rpidv "[1, 0.065, 0.000215, 0.01385, 0.42]"
-    Best settings so far:
-    "[1, 0.065, 0.000215, 0.01385, 0.42]"
-    rosparam set /rpidv "[1, 0.066, 0.0005, 0.036, 0.3]"
-    "[1, 0.066, 0.0005, 0.02, 0.28]"
-    last: 
-    "[1, 0.063, 0.000015, 0.0138, 0.45]"
-    rosparam set /rpidv "[1, 0.066, 0.0001, 0.020, 0.28]"
     rosparam set /rpidv "[1, 0.064, 0.0001, 0.02, 0.29]"
     """
     
-
     while not rospy.is_shutdown():
         # Measure elapsed time
         delta_time = time.time() - start_time
@@ -114,17 +105,10 @@ def main():
         tof_data = sum(node.tof_data)/len(node.tof_data)
 
         if node.left_turn == True and not node.executed_left_turn:
-            #left_turn_start_time = time.time()
             print("left turn = True")
             node.set_wheels_velocity(0.2, 0.28)
             time.sleep(1)
             node.executed_left_turn = True
-        
-
-        #if node.executed_left_turn == True:
-        #    if time.time() - left_turn_start_time >= 60:
-        #        node.left_turn, node.executed_left_turn = False, False
-        #        print("Left turn = False")
 
         try:
             error, node.left_turn = error_calculator(node.array_value)
@@ -146,26 +130,8 @@ def main():
                 time.sleep(0.85)
                 node.set_wheels_velocity(0.15, 0.2)
                 time.sleep(2)
-                ##node.set_wheels_velocity(0.1, 0.0)
-                ##time.sleep(0.575)
-                ##node.set_wheels_velocity(0.15, 0.15)
-                ##time.sleep(1.2)
-                ##node.set_wheels_velocity(0.0, 0.1)
-                ##time.sleep(0.625)
-                ##node.set_wheels_velocity(0.10, 0.155)
-                ##time.sleep(1.8)
-                #node.set_wheels_velocity(0.2, 0.0)
-                #time.sleep(0.935)
-                #node.set_wheels_velocity(0.15, 0.15)
-                #time.sleep(1.4)
-                #node.set_wheels_velocity(0.0, 0.2)
-                #time.sleep(0.95)
-                #node.set_wheels_velocity(0.15, 0.15)
-                #time.sleep(1.2)
-                #node.set_wheels_velocity(0.0, 0.2)
-                #time.sleep(0.65)
-                #node.set_wheels_velocity(0.25, 0.15)
-                #time.sleep(1)
+                node.executed_left_turn = False
+                node.left_turn = False
             else:
                 node.run(v_max, pid)
         else:

@@ -5,11 +5,9 @@ def error_calculator(array_value):
     counter = 0
     left_turn = False
     left_turn_array_value_list = ['10010000', '11001000', '10011000', '11001100',
-                                        '01000100','00100100', '01001000', '10001000','01001100'] #'11011000' '11010000' 10100000','10110000'
+                                        '01000100','00100100', '01001000', '10001000','01001100'] 
     if array_value in left_turn_array_value_list:
         left_turn = True
-        
-    
     
     for index in range(len(array_value)):
         if array_value[index] == "1":
