@@ -30,7 +30,7 @@ class AutonomusDuck(DTROS):
         self.odo_values = 0
         self.array_value = 0
         self.left_turn = True
-        self.executed_left_turn = False
+        self.executed_left_turn = True
         # construct wheel encoders and tof sensor subscribers
         self.left_encoder_data = rospy.Subscriber(f'/{self.veh_name}/left_wheel_encoder_node/tick',
                                                     WheelEncoderStamped, self.left_callback)
@@ -88,7 +88,7 @@ def main():
     start_time = time.time()
     prev_error = 0
     integral = 0
-    left_turn_start_time = 0
+    turn_time = 0
     # Set initial parameters for duck's devel run (run, Kp, Ki, Kd, v_max).
     rospy.set_param("/rpidv", [1, 0.064, 0.0001, 0.02, 0.32])
     """
@@ -118,7 +118,11 @@ def main():
         pid, integral, prev_error = pid_controller(error, integral,
                                                    prev_error, delta_time,
                                                    kp, ki, kd)
-
+        
+        if 20 < time.time() - turn_time < 21:
+            node.executed_left_turn = True
+            node.left_turn = True
+            
         if run:
             
             if 0.25 < tof_data < 0.35:
@@ -129,7 +133,8 @@ def main():
                 node.set_wheels_velocity(0.0, 0.2)
                 time.sleep(0.85)
                 node.set_wheels_velocity(0.15, 0.2)
-                time.sleep(2)
+                time.sleep(0.5)
+                turn_time = time.time()
                 node.executed_left_turn = False
                 node.left_turn = False
             else:
