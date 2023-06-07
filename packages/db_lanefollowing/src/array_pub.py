@@ -6,8 +6,11 @@ from std_msgs.msg import String
 from smbus2 import SMBus
 
 def talker():
+    """Line reader publisher.
+    Reading data over i2c and converts it to 8bit string
+    Messages it to topic"""
     vechicle_name = os.environ["VEHICLE_NAME"]
-    pub = rospy.Publisher(f'/{vechicle_name}/line_array', String, queue_size=20)
+    pub = rospy.Publisher(f'/{vechicle_name}/line_array', String, queue_size=1)
     rospy.init_node('array_pub', anonymous=True)
     
     rate = rospy.Rate(20) # 10hz
