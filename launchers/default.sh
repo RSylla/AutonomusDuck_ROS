@@ -16,8 +16,7 @@ dt-launchfile-init
 dt-exec rosrun db_lanefollowing AutonomusDuck.py
 dt-exec rosrun db_lanefollowing odometry.py
 dt-exec rosrun db_lanefollowing array_pub.py
-#dt-exec rosrun db_lanefollowing imu_sub.py
-#dt-exec roslaunch imu_driver imu_node.launch veh:=$VEHICLE_NAME
+dt-exec roslaunch imu_driver imu_node.launch veh:=$VEHICLE_NAME
 
 # ----------------------------------------------------------------------------
 # YOUR CODE ABOVE THIS LINE
